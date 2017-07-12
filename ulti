@@ -1,0 +1,75 @@
+#-*- coding:utf-8 –*-
+import skimage.io
+import skimage.transform
+from PIL import ImageFile
+import os
+import ipdb
+
+import numpy as np
+
+#def load_image( path, height=128, width=128 ):
+################################################
+#LGCIC height = 64 width = 64
+#
+# def load_image( path, pre_height=146, pre_width=146, height=128, width=128 ):
+################################################################################
+#改动将pre_height和 height 等尺寸按比例缩短
+def load_image( path, pre_height=73, pre_width=73, height=64, width=64 ):
+    try:
+        img = skimage.io.imread( path ).astype( float )
+    except:
+        return None
+#对图片元素归一化，对实际计算结果无影响
+    img /= 255.
+
+    if img is None: return None
+    if len(img.shape) < 2: return None
+    if len(img.shape) == 4: return None
+    if len(img.shape) == 2: img=np.tile(img[:,:,None], 3)
+    if img.shape[2] == 4: img=img[:,:,:3]
+    if img.shape[2] > 4: return None
+
+    #resized_img 输出64*64 的矩形图片
+    short_edge = min( img.shape[:2] )
+    yy = int((img.shape[0] - short_edge) / 2)
+    xx = int((img.shape[1] - short_edge) / 2)
+
+    #以长边为基准，对称截取边长为短边的正方形图片
+
+    #crop_img 原图短边x原图短边的矩形
+    crop_img = img[yy:yy+short_edge, xx:xx+short_edge]
+
+    #resize_img 在crop_img 基础上输出73*73的预压缩图像
+    resized_img = skimage.transform.resize( crop_img, [pre_height,pre_width] )
+
+    #在预压缩图片基础上随机选取64*64的图片
+    rand_y = np.random.randint(0, pre_height - height)
+    rand_x = np.random.randint(0, pre_width - width)
+    # resized_img 输出64x64 的矩形图片
+    resized_img = resized_img[ rand_y:rand_y+height, rand_x:rand_x+width, : ]
+
+    return (resized_img * 2)-1 #(resized_img - 127.5)/127.5
+
+# def crop_random(image_ori, width=64,height=64, x=None, y=None, overlap=7):
+#改动将width 和 height 设为24:32 的随机数
+#############################################################################
+def crop_random(image_ori, width, height, x=None, y=None, overlap=7):
+    if image_ori is None: return None
+    width = np.random.randint(24,33)
+    height = np.random.randint(24, 33)
+    random_y = np.random.randint(overlap,height-overlap) if x is None else x
+    random_x = np.random.randint(overlap,width-overlap) if y is None else y
+
+    image = image_ori.copy()
+    crop = image_ori.copy()
+    crop = crop[random_y:random_y+height, random_x:random_x+width]
+
+    #crop 中的颜色为数据集的平均颜色
+    image[random_y + overlap:random_y+height - overlap, random_x + overlap:random_x+width - overlap, 0] = 2*117. / 255. - 1.
+    image[random_y + overlap:random_y+height - overlap, random_x + overlap:random_x+width - overlap, 1] = 2*104. / 255. - 1.
+    image[random_y + overlap:random_y+height - overlap, random_x + overlap:random_x+width - overlap, 2] = 2*123. / 255. - 1.
+
+#   return image, crop, random_x, random_y
+#增加mask hight 和width 尺寸
+    return image, crop, random_x, random_y, width, height
+
